@@ -219,28 +219,37 @@ Question 5- Death Toll
 library(ggplot2)
 library(dplyr)
 library(lubridate)
-
+library(stringi)
 covid_data$date <- as.Date(covid_data$date)
+
 covid_2021 <- filter(covid_data, year(date) == 2021)
-covid_deaths_by_county <- group_by(covid_2021, county)
-covid_deaths_by_county <- summarise(covid_deaths_by_county, total_covid_deaths = sum(deaths, na.rm = TRUE))
+covid_deaths_by_county <- covid_2021 %>%
+    group_by(county) %>%
+    summarise(total_covid_deaths = sum(deaths, na.rm = TRUE), .groups = "drop")
 
-# Step 3: Merge
+population_data$CTYNAME <- stri_trans_general(population_data$CTYNAME, "Latin-ASCII")
+covid_deaths_by_county$county <- stri_trans_general(covid_deaths_by_county$county, "Latin-ASCII")
 population_data$FIPS <- as.character(population_data$fips)
-merged_data <- merge(covid_deaths_by_county, population_data, by.x = "county", by.y = "CTYNAME")
 
+merged_data <- merge(covid_deaths_by_county, population_data, by.x = "county", by.y = "CTYNAME", all.x = TRUE)
 merged_data$covid_death_percentage <- (merged_data$total_covid_deaths / merged_data$POPESTIMATE2021) * 100
-high_impact_counties <- subset(merged_data, covid_death_percentage >= 20)
-plot <- ggplot(high_impact_counties, aes(x = reorder(county, covid_death_percentage), y = covid_death_percentage)) +
-  geom_bar(stat = "identity", fill = "aquamarine") +
-  coord_flip() +  
-  labs(title = "Counties Where COVID Deaths Accounted for 20%+ of Annual Deaths in 2021",
-       x = "County", y = "Percentage of Deaths from COVID") +
-  theme_minimal(base_size = 16) +  # Graph size
-  theme(axis.text.y = element_text(size = 5),  # Y-axis labels size
-        plot.title = element_text(size = 11))  # Title size
-ggsave("Lab03_img/covid_deaths_percentage_by_county.png", plot = plot, width = 10, height = 8)
 
+high_impact_counties <- subset(merged_data, covid_death_percentage >= 20)
+
+print(high_impact_counties[high_impact_counties$covid_death_percentage > 100, ])
+
+plot <- ggplot(high_impact_counties, aes(x = reorder(county, covid_death_percentage), y = covid_death_percentage)) +
+    geom_bar(stat = "identity", fill = "aquamarine") +
+    coord_flip() +  
+    labs(title = "Counties Where COVID Deaths Accounted for 20%+ of Annual Deaths in 2021",
+         x = "County", y = "Percentage of Deaths from COVID") +
+    theme_minimal(base_size = 16) +  # Graph size
+    theme(axis.text.y = element_text(size = 5),
+          plot.title = element_text(size = 11))
+if (!dir.exists("Lab03_img")) {
+    dir.create("Lab03_img")
+}
+ggsave("Lab03_img/covid_deaths_percentage_by_county.png", plot = plot, width = 10, height = 8)
 ```
 
 Question 6: Multi-state
